@@ -178,4 +178,54 @@ class MeetingService
 
         $meeting->save();
     }
+
+    // أضف هذه الوظيفة داخل كلاس MeetingService
+
+public function createZoomMeeting(Booking $booking)
+{
+    // 1. الحصول على التوكن
+    $token = $this->getAccessToken();
+    
+    // 2. طلب إنشاء ميتنج من زووم
+    $response = \Illuminate\Support\Facades\Http::withToken($token)
+        ->post("https://api.zoom.us/v2/users/me/meetings", [
+            'topic' => 'Lesson with ' . $booking->user->name,
+            'type' => 2, // Scheduled Meeting
+            'start_time' => $booking->getLessonStartAt()->format('Y-m-d\TH:i:s'),
+            'duration' => $booking->getLessonDurationMinutes(),
+            'settings' => [
+                'join_before_host' => true,
+                'host_video' => true,
+                'participant_video' => true,
+                'mute_upon_entry' => true,
+                'waiting_room' => false,
+            ]
+        ]);
+
+    if ($response->successful()) {
+        $data = $response->json();
+        // هنا بنخزن البيانات الحقيقية في جدول الميتنج عندك
+        $meeting = $this->ensureMeetingForBooking($booking);
+        $meeting->update([
+            'zoom_meeting_id' => $data['id'],
+            'zoom_password' => $data['password'],
+            'start_url' => $data['start_url'],
+            'join_url' => $data['join_url'],
+        ]);
+        return $meeting;
+    }
+
+    return null;
+}
+
+private function getAccessToken()
+{
+    $response = \Illuminate\Support\Facades\Http::asForm()->post('https://zoom.us/oauth/token', [
+        'grant_type' => 'account_credentials',
+        'account_id' => config('services.zoom.account_id'),
+        'client_id' => config('services.zoom.client_id'),
+        'client_secret' => config('services.zoom.client_secret'),
+    ]);
+    return $response->json('access_token');
+}
 }

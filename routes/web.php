@@ -44,6 +44,8 @@ use App\Http\Controllers\MeetingController;
 use App\Http\Controllers\Admin\BookingMeetingController;
 use App\Http\Controllers\MeetingRoomController;
 use App\Http\Controllers\Zoom\SignatureController;
+use App\Http\Controllers\ZoomController;
+
 
 /*
 |--------------------------------------------------------------------------
@@ -117,10 +119,15 @@ Route::middleware('auth')->group(function () {
 | - meetings.room + heartbeat: للجميع (auth) مع server-side gating
 | - zoom.sdk.signature: للجميع (auth) لأن الطالب/المعلم لازم يطلبوا Signature
 */
+    Route::post('/zoom/signature', [SignatureController::class, 'generate'])
+        ->name('zoom.signature');
 Route::middleware('auth')->group(function () {
 
     Route::get('/meetings/{booking}/room', [MeetingController::class, 'room'])
         ->name('meetings.room');
+
+
+Route::post('/zoom/signature', [MeetingController::class, 'generateSignature'])->name('zoom.signature');
 
     Route::get('/meetings/{booking}/heartbeat', [MeetingController::class, 'heartbeat'])
         ->middleware('auth');
@@ -129,10 +136,12 @@ Route::middleware('auth')->group(function () {
 });
 
 
-Route::middleware(['auth'])->group(function () {
-    Route::post('/zoom/signature', [SignatureController::class, 'generate'])
-        ->name('zoom.signature');
-});
+
+
+Route::get('/zoom', [ZoomController::class, 'index'])->name('zoom.index');
+Route::post('/zoom', [ZoomController::class, 'store'])->name('zoom.store');
+
+
 
 
 /*
@@ -287,4 +296,8 @@ Route::middleware(['auth', 'student'])
         // AJAX: Available Slots
         Route::get('/teachers/{teacher}/available-slots', [TeacherAvailabilityController::class, 'availableSlots'])
             ->name('teachers.availableSlots');
+
+
+    Route::get('/booking/{booking}/zoom-link', [ZoomLinkController::class, 'getJoinLink'])
+        ->name('zoom.link');
     });

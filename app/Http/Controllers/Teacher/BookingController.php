@@ -1,5 +1,4 @@
 <?php
-
 namespace App\Http\Controllers\Teacher;
 
 use App\Http\Controllers\Controller;
@@ -52,7 +51,7 @@ class BookingController extends Controller
 
         // ✅ مين آخر شخص غيّر الحالة (لو موجود)
         $statusUpdater = null;
-        if (!empty($booking->status_updated_by)) {
+        if (! empty($booking->status_updated_by)) {
             $statusUpdater = User::find($booking->status_updated_by);
         }
 
@@ -68,7 +67,7 @@ class BookingController extends Controller
      * تحديث حالة الحجز (تأكيد / إلغاء)
      * ✅ Batch 1: عند التأكيد ننشئ Meeting، وعند الإلغاء نقفل Meeting إن وجد
      */
-    public function updateStatus(Request $request, Booking $booking, MeetingService $meetingService)
+  public function updateStatus(Request $request, Booking $booking, MeetingService $meetingService)
     {
         $this->authorizeBooking($booking);
 
@@ -83,7 +82,7 @@ class BookingController extends Controller
             return back()->with('success', 'الحالة بالفعل: ' . $newStatus);
         }
 
-        // ✅ تحديث الحالة + سجل مين/إمتى/المصدر
+        // ✅ تحديث الحالة + سجل من قام بالتحديث ومصدره
         $booking->status = $newStatus;
 
         if ($this->hasBookingColumn('status_updated_by')) {
@@ -98,45 +97,40 @@ class BookingController extends Controller
 
         $booking->save();
 
-        // ✅ Batch 1: تجهيز Meeting عند التأكيد
+        // ✅ في حالة التأكيد: إنشاء الاجتماع والتحويل التلقائي
         if ($newStatus === 'confirmed') {
-            try {
-                // Batch 1: Meeting داخلي + حساب التوقيت
-                $meetingService->ensureMeetingForBooking($booking);
-            } catch (\Throwable $e) {
-                // لا نكسر العملية بسبب الاجتماع
-            }
+            // 1. إنشاء سجل الاجتماع الداخلي (البيانات الأساسية)
+            $meetingService->ensureMeetingForBooking($booking);
 
-            // ✅ Batch 2: تجهيز Zoom meeting (مرة واحدة)
-            try {
-                app(\App\Services\Zoom\ZoomMeetingProvisioner::class)
-                    ->ensureZoomMeetingForBooking($booking);
-            } catch (\Throwable $e) {
-                // لا نكسر تأكيد الحجز بسبب Zoom
+            // 2. طلب إنشاء الاجتماع من زووم وحفظ الروابط
+            // 💡 ملاحظة: شيلنا الـ try-catch هنا عشان لو في مشكلة تظهر لكِ فوراً ونعرف سبب عدم التخزين
+            app(\App\Services\Zoom\ZoomMeetingProvisioner::class)
+                ->ensureZoomMeetingForBooking($booking);
+
+            // 3. إعادة تحميل الحجز مع بيانات الاجتماع الجديدة
+            $booking->load('meeting');
+
+            // 4. التحويل التلقائي للمعلم لغرفة الاجتماع (الصفحة السوداء)
+            if ($booking->meeting && $booking->meeting->provider_meeting_id) {
+                return redirect()->route('meetings.room', $booking->id)
+                                 ->with('success', 'تم تأكيد الحجز وإنشاء غرفة الاجتماع بنجاح.');
             }
         }
 
-
-        // ✅ Batch 1: قفل Meeting عند الإلغاء
+        // ✅ في حالة الإلغاء: قفل الاجتماع إن وجد
         if ($newStatus === 'cancelled') {
-            try {
-                // لو الـ relation meeting موجودة بعد ما نضيفها في Booking model (خطوة لاحقة)
-                if (method_exists($booking, 'meeting')) {
-                    $booking->loadMissing(['meeting']);
-                    if ($booking->meeting) {
-                        $booking->meeting->status = 'cancelled';
-                        $booking->meeting->actual_ended_at = now();
-                        // نقفل النافذة فورًا
-                        $booking->meeting->allow_join_until = now();
-                        $booking->meeting->save();
-                    }
+            if (method_exists($booking, 'meeting')) {
+                $booking->loadMissing(['meeting']);
+                if ($booking->meeting) {
+                    $booking->meeting->status = 'cancelled';
+                    $booking->meeting->actual_ended_at = now();
+                    $booking->meeting->allow_join_until = now();
+                    $booking->meeting->save();
                 }
-            } catch (\Throwable $e) {
-                // لا نكسر العملية بسبب الاجتماع
             }
         }
 
-        // ✅ إشعار للطالب عند تغيير الحالة
+        // ✅ إشعار الطالب بتغيير الحالة
         $this->notifyStudentStatusChanged($booking, $newStatus);
 
         return back()->with('success', 'تم تحديث حالة الحجز بنجاح.');
@@ -217,8 +211,8 @@ class BookingController extends Controller
             if (method_exists($booking, 'meeting')) {
                 $booking->loadMissing(['meeting']);
                 if ($booking->meeting) {
-                    $booking->meeting->status = 'cancelled';
-                    $booking->meeting->actual_ended_at = now();
+                    $booking->meeting->status           = 'cancelled';
+                    $booking->meeting->actual_ended_at  = now();
                     $booking->meeting->allow_join_until = now();
                     $booking->meeting->save();
                 }
@@ -329,7 +323,7 @@ class BookingController extends Controller
             $studentUser = $booking->student;
 
             // fallback لو student relation مش راجعة لأي سبب
-            if (!$studentUser && !empty($booking->user_id)) {
+            if (! $studentUser && ! empty($booking->user_id)) {
                 $studentUser = User::find($booking->user_id);
             }
 

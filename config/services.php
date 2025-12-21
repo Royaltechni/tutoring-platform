@@ -38,10 +38,13 @@ return [
     */
 
      // Zoom S2S OAuth (إنشاء الاجتماعات وجلب ZAK)
-    'zoom' => [
-        'account_id' => env('ZOOM_S2S_ACCOUNT_ID'),
-        'client_id' => env('ZOOM_S2S_CLIENT_ID'),
-        'client_secret' => env('ZOOM_S2S_CLIENT_SECRET'),
-        'default_host_email' => env('ZOOM_DEFAULT_HOST_EMAIL'),
-    ],
+'zoom' => [
+    'sdk_key' => env('ZOOM_MEETING_SDK_KEY'),
+    'sdk_secret' => env('ZOOM_MEETING_SDK_SECRET'),
+    'client_id' => env('ZOOM_CLIENT_ID'),
+    'client_secret' => env('ZOOM_CLIENT_SECRET'),
+    'account_id' => env('ZOOM_ACCOUNT_ID'),
+    'default_host_email' => env('ZOOM_DEFAULT_HOST_EMAIL'),
+],
+
 ];

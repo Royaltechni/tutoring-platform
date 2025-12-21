@@ -39,6 +39,9 @@ class Meeting extends Model
     'forced_ended_by_admin_id',
     'forced_ended_at',
     'forced_end_reason',
+    'start_url', // أضيفي هذا
+    'join_url',  // أضيفي هذا
+
     ];
 
     protected $casts = [
